@@ -16,7 +16,9 @@ JUPITER_MASS_TO_SOLAR_MASS = 9.5479e-4
 
 
 def random_angle():
-    return random.random() * 2.0 * np.pi
+    rng = np.random.default_rng(seed=42)
+    psi = rng.uniform(0.0,2.0*np.pi)
+    return psi
 
 
 def format_time(seconds):
@@ -88,7 +90,7 @@ def build_simulation(config):
     imin = np.deg2rad(float(disk["imin_deg"]))
     imax = np.deg2rad(float(disk["imax_deg"]))
 
-    npl = int(config["dwarf_planets"]["N"])
+    npl = int(config["massive_planetesimals"]["N"])
     Npart = int(config["test_particles"]["N"])
 
 
@@ -103,13 +105,16 @@ def build_simulation(config):
     sim.integrator = config["integration"]["integrator"]
 
     sim.exit_max_distance = float(config["integration"]["exit_max_distance"])
+    print(config["simulation"]["dump"])
+    file_path = Path("dump_data.json")
+
 
     # Star
     sim.add(m=Mstar, name="star")
 
     dump_condition = config['simulation']["dump"] 
 
-    if dump_condition:
+    if not dump_condition or not file_path.exists():
         file_path = Path("dump_data.json")
         if file_path.is_file():
             print(f"Started integration from snapshot unknown[to change later]")
@@ -117,133 +122,171 @@ def build_simulation(config):
                 dump_data = json.load(file)
             print(dump_data)
 
-            exit()
+        # Giant planet
+        sim.add(
+            primary=sim.particles[0],
+            m=M_planet,
+            a=a_planet,
+            e=e_planet,
+            inc=inc_planet,
+            omega=omega_planet,
+            Omega=Omega_planet,
+            M=MA_planet,
+            name= "GP"
+        )
+
+        timestep_fraction = float(
+            config["integration"]["timestep_fraction_of_planet_period"]
+        )
+
+        sim.dt = timestep_fraction * sim.particles[1].P
+
+        # Massive planetesimals
+        # -------------
+        # We support two ways of assigning massive planetesimal mass:
+        #
+        # 1. Preferred new method:
+        #       massive_planetesimals:
+        #           N: 500
+        #           total_mass_earth: 1.0
+        #
+        #    This means the full MP population has a total mass of 1 Earth mass.
+        #    Each MP receives an equal share of that mass.
+        #
+        # 2. Older method:
+        #       massive_planetesimals:
+        #           N: 10
+        #           mass_fraction_of_giant_planet: 1.0e-8
+        #
+        #    This means each MP has a mass equal to a fraction of the giant planet mass.
+        # "massive_planetesimals" used to be referred to as dwarf_planets
+
+        if npl > 0:
+            if "total_mass_earth" in config["massive_planetesimals"]:
+                total_mass_earth = float(
+                    config["massive_planetesimals"]["total_mass_earth"]
+                )
+
+                total_mass_solar = (
+                    total_mass_earth * EARTH_MASS_TO_SOLAR_MASS
+                )
+
+                m_mps = total_mass_solar / npl
+
+                print("\n Massive planetesimals mass setup:")
+                print(f"  Method: total_mass_earth")
+                print(f"  Number of MPs: {npl}")
+                print(f"  Total MP mass: {total_mass_earth:.6f} Earth masses")
+                print(f"  Individual MP mass: {m_mps:.6e} Msun")
+
+            elif "mass_fraction_of_giant_planet" in config["massive_planetesimals"]:
+                mass_fraction = float(
+                    config["massive_planetesimals"]["mass_fraction_of_giant_planet"]
+                )
+
+                m_mps = M_planet * mass_fraction
+
+                print("\n Massive planetesimals mass setup:")
+                print(f"  Method: mass_fraction_of_giant_planet")
+                print(f"  Number of MPs: {npl}")
+                print(f"  Mass fraction per MP: {mass_fraction:.6e}")
+                print(f"  Individual MP mass: {m_mps:.6e} Msun")
+
+            else:
+                raise ValueError(
+                    "massive_planetesimals must include either "
+                    "'total_mass_earth' or 'mass_fraction_of_giant_planet'."
+                )
+
+            for i in range(npl):
+                random_seed = 42
+                rng = np.random.default_rng(random_seed)
+                sim.add(
+                    primary=sim.particles[0],
+                    m=m_mps,
+                    a=rng.uniform(amin, amax),
+                    e=rng.uniform(emin, emax),
+                    inc=rng.uniform(imin, imax),
+                    omega=random_angle(),
+                    Omega=random_angle(),
+                    M=random_angle(),
+                    name= f"MP_{i}"
+                )
+
         else:
-            print("Started integration from 0 and made new JSON file")
+            m_mps = 0.0
 
-       
+            print("\n Massive_planetesimalsmass setup:")
+            print("  Number of MPs: 0")
+            print("  No massive_planetesimals added.")
 
+        sim.N_active = npl + 2
+        sim.move_to_com()
 
-    
-    # Giant planet
-    sim.add(
-        primary=sim.particles[0],
-        m=M_planet,
-        a=a_planet,
-        e=e_planet,
-        inc=inc_planet,
-        omega=omega_planet,
-        Omega=Omega_planet,
-        M=MA_planet,
-        name= "GP"
-    )
+        # Test particles
+        for i in range(Npart):
+            M_deg = config["disk"].get("M_deg", None)
 
-    timestep_fraction = float(
-        config["integration"]["timestep_fraction_of_planet_period"]
-    )
+            if M_deg is None:
+                M_value = random_angle()
+            else:
+                M_value = np.radians(float(M_deg))
 
-    sim.dt = timestep_fraction * sim.particles[1].P
-
-    # Dwarf planets
-    # -------------
-    # We support two ways of assigning dwarf planet mass:
-    #
-    # 1. Preferred new method:
-    #       dwarf_planets:
-    #           N: 500
-    #           total_mass_earth: 1.0
-    #
-    #    This means the full DP population has a total mass of 1 Earth mass.
-    #    Each DP receives an equal share of that mass.
-    #
-    # 2. Older method:
-    #       dwarf_planets:
-    #           N: 10
-    #           mass_fraction_of_giant_planet: 1.0e-8
-    #
-    #    This means each DP has a mass equal to a fraction of the giant planet mass.
-
-    if npl > 0:
-        if "total_mass_earth" in config["dwarf_planets"]:
-            total_mass_earth = float(
-                config["dwarf_planets"]["total_mass_earth"]
-            )
-
-            total_mass_solar = (
-                total_mass_earth * EARTH_MASS_TO_SOLAR_MASS
-            )
-
-            mdps = total_mass_solar / npl
-
-            print("\nDwarf planet mass setup:")
-            print(f"  Method: total_mass_earth")
-            print(f"  Number of DPs: {npl}")
-            print(f"  Total DP mass: {total_mass_earth:.6f} Earth masses")
-            print(f"  Individual DP mass: {mdps:.6e} Msun")
-
-        elif "mass_fraction_of_giant_planet" in config["dwarf_planets"]:
-            mass_fraction = float(
-                config["dwarf_planets"]["mass_fraction_of_giant_planet"]
-            )
-
-            mdps = M_planet * mass_fraction
-
-            print("\nDwarf planet mass setup:")
-            print(f"  Method: mass_fraction_of_giant_planet")
-            print(f"  Number of DPs: {npl}")
-            print(f"  Mass fraction per DP: {mass_fraction:.6e}")
-            print(f"  Individual DP mass: {mdps:.6e} Msun")
-
-        else:
-            raise ValueError(
-                "dwarf_planets must include either "
-                "'total_mass_earth' or 'mass_fraction_of_giant_planet'."
-            )
-
-        for i in range(npl):
             sim.add(
                 primary=sim.particles[0],
-                m=mdps,
                 a=np.random.uniform(amin, amax),
                 e=np.random.uniform(emin, emax),
                 inc=np.random.uniform(imin, imax),
                 omega=random_angle(),
                 Omega=random_angle(),
-                M=random_angle(),
-                name= f"DP_{i}"
+                M=M_value,
+                name = f"TP_{i}"
             )
 
+        return sim
     else:
-        mdps = 0.0
+        print("File exits")
+        print("Reading dump file...")
+        with open("dump_data.json", "r", encoding="utf-8") as file:
+            dump_data = json.load(file)
+        
+        for i, particle in enumerate(dump_data):
+        
+            print(particle)
+            time = dump_data[particle]["time"]
+            snapshot_number = dump_data[particle]["snapshot_number"]
+            m = dump_data[particle]["m"]
+            x = dump_data[particle]["x"]
+            y = dump_data[particle]["y"]
+            z = dump_data[particle]["z"]
+            vx = dump_data[particle]["vx"]
+            vy = dump_data[particle]["vy"]
+            vz = dump_data[particle]["vz"]
+            # Giant planet
 
-        print("\nDwarf planet mass setup:")
-        print("  Number of DPs: 0")
-        print("  No dwarf planets added.")
+            sim.add(
+                primary=sim.particles[0],
+                m=M_planet,
+                a=a_planet,
+                e=e_planet,
+                inc=inc_planet,
+                omega=omega_planet,
+                Omega=Omega_planet,
+                M=MA_planet,
+                name= "GP"
+            )
 
-    sim.N_active = npl + 2
-    sim.move_to_com()
+            if i == 1:
+                timestep_fraction = float(
+                    config["integration"]["timestep_fraction_of_planet_period"]
+                )
 
-    # Test particles
-    for i in range(Npart):
-        M_deg = config["disk"].get("M_deg", None)
+                #sim.dt = timestep_fraction * sim.particles[1].P
+                print(i)
+                exit()
+                
 
-        if M_deg is None:
-            M_value = random_angle()
-        else:
-            M_value = np.radians(float(M_deg))
-
-        sim.add(
-            primary=sim.particles[0],
-            a=np.random.uniform(amin, amax),
-            e=np.random.uniform(emin, emax),
-            inc=np.random.uniform(imin, imax),
-            omega=random_angle(),
-            Omega=random_angle(),
-            M=M_value,
-            name = f"TP_{i}"
-        )
-
-    return sim
+    exit()
 
 def get_particles(snap_number, sim):
     '''
@@ -267,10 +310,15 @@ def get_particles(snap_number, sim):
                 "vy": p.vy,
                 "vz": p.vz
             }
+        if snap_number == 2:
+            print(dict_row)
+        
+        
         
     
     with open("dump_data.json", "w") as file:
         json.dump(dict_row, file, indent=4)
+
     
     
 

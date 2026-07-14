@@ -28,7 +28,7 @@ def validate_config(config):
         "star",
         "giant_planet",
         "disk",
-        "dwarf_planets",
+        "massive_planetesimals",
         "test_particles",
     ]
 
