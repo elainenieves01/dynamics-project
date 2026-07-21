@@ -58,6 +58,10 @@ def format_time(seconds):
 
 
 def build_simulation(config):
+
+    random_seed = 42
+    rng = np.random.default_rng(random_seed)
+    
     Mstar = float(config["star"]["mass"])
 
     gp = config["giant_planet"]
@@ -120,7 +124,6 @@ def build_simulation(config):
             print(f"Started integration from snapshot unknown[to change later]")
             with open('dump_data.json', 'r', encoding='utf-8') as file:
                 dump_data = json.load(file)
-            print(dump_data)
 
         # Giant planet
         sim.add(
@@ -197,21 +200,23 @@ def build_simulation(config):
                     "massive_planetesimals must include either "
                     "'total_mass_earth' or 'mass_fraction_of_giant_planet'."
                 )
-
+            
+            
+            
             for i in range(npl):
-                random_seed = 42
-                rng = np.random.default_rng(random_seed)
+                
                 sim.add(
                     primary=sim.particles[0],
                     m=m_mps,
                     a=rng.uniform(amin, amax),
                     e=rng.uniform(emin, emax),
                     inc=rng.uniform(imin, imax),
-                    omega=random_angle(),
-                    Omega=random_angle(),
-                    M=random_angle(),
+                    omega=rng.uniform(0,2*np.pi),
+                    Omega=rng.uniform(0,2*np.pi),
+                    M = rng.uniform(0,2*np.pi),
                     name= f"MP_{i}"
                 )
+
 
         else:
             m_mps = 0.0
@@ -228,20 +233,42 @@ def build_simulation(config):
             M_deg = config["disk"].get("M_deg", None)
 
             if M_deg is None:
-                M_value = random_angle()
+                M = rng.uniform(0,2*np.pi)
             else:
-                M_value = np.radians(float(M_deg))
+                M = np.radians(float(M_deg))
+                
+                sim.add(
+                    primary=sim.particles[0],
+                    m=0.0,
+                    a=rng.uniform(amin, amax),
+                    e=rng.uniform(emin, emax),
+                    inc=rng.uniform(imin, imax),
+                    omega=rng.uniform(0,2*np.pi),
+                    Omega=rng.uniform(0,2*np.pi),
+                    M = M,
+                    name= f"TP_{i}"
+                )
+         for i in range(npl):
+            M_deg = config["disk"].get("M_deg", None)
 
-            sim.add(
-                primary=sim.particles[0],
-                a=np.random.uniform(amin, amax),
-                e=np.random.uniform(emin, emax),
-                inc=np.random.uniform(imin, imax),
-                omega=random_angle(),
-                Omega=random_angle(),
-                M=M_value,
-                name = f"TP_{i}"
-            )
+            if M_deg is None:
+                M = rng.uniform(0,2*np.pi)
+            else:
+                M = np.radians(float(M_deg))
+                
+                sim.add(
+                    primary=sim.particles[0],
+                    m=m_mps,
+                    a=rng.uniform(amin, amax),
+                    e=rng.uniform(emin, emax),
+                    inc=rng.uniform(imin, imax),
+                    omega=rng.uniform(0,2*np.pi),
+                    Omega=rng.uniform(0,2*np.pi),
+                    M = M,
+                    name= f"MP_{i}"
+                )
+        
+        
 
         return sim
     else:
@@ -262,36 +289,34 @@ def build_simulation(config):
             vx = dump_data[particle]["vx"]
             vy = dump_data[particle]["vy"]
             vz = dump_data[particle]["vz"]
+
             # Giant planet
+        exit()
+            # sim.add(
+            #     primary=sim.particles[0],
+            #     m=M_planet,
+            #     a=a_planet,
+            #     e=e_planet,
+            #     inc=inc_planet,
+            #     omega=omega_planet,
+            #     Omega=Omega_planet,
+            #     M=MA_planet,
+            #     name= f"GP_{i}"
+            # )
 
-            sim.add(
-                primary=sim.particles[0],
-                m=M_planet,
-                a=a_planet,
-                e=e_planet,
-                inc=inc_planet,
-                omega=omega_planet,
-                Omega=Omega_planet,
-                M=MA_planet,
-                name= "GP"
-            )
+            # if i == 1:
+            #     timestep_fraction = float(
+            #         config["integration"]["timestep_fraction_of_planet_period"]
+            #     )
 
-            if i == 1:
-                timestep_fraction = float(
-                    config["integration"]["timestep_fraction_of_planet_period"]
-                )
+            #     sim.dt = timestep_fraction * sim.particles[1].P
+        return sim
 
-                #sim.dt = timestep_fraction * sim.particles[1].P
-                print(i)
-                exit()
-                
-
-    exit()
 
 def get_particles(snap_number, sim):
     '''
     prints out the particles in a snapshot
-    takes in: i, simulation
+    takes in: i, simulation ; saves the particle in the dump file
     i is the snapshot number 
     example sim = rebound.Simulation()
     '''
@@ -310,8 +335,6 @@ def get_particles(snap_number, sim):
                 "vy": p.vy,
                 "vz": p.vz
             }
-        if snap_number == 2:
-            print(dict_row)
         
         
         
@@ -346,6 +369,13 @@ def run_simulation(config):
 
     sim = build_simulation(config)
 
+    # print(f"time = {times}")
+    # print(f"sim.dt={sim.t}, sim.particles= {sim.particles}")
+    # for i, p in enumerate(sim.particles):
+    #     print(f'{i} name= {p.name}')
+    #     print(f'x= {p.x} y= {p.y} z= {p.z}')
+   #exit()
+
     E0 = sim.energy()
 
     print("\nBeginning the main integration")
@@ -357,7 +387,16 @@ def run_simulation(config):
             get_particles(i,sim)
     
         try:
+            #print(f"time = {times}")
+            #print(f"sim.dt={sim.t}, sim.particles= {sim.particles}")
+            #for i, p in enumerate(sim.particles):
+                #print(i)
+                #print(f'x= {p.x} y= {p.y} z= {p.z}')
+                
+
+            #exit()
             sim.integrate(int_time)
+            
 
 
         except rebound.Escape as error:
@@ -386,7 +425,8 @@ def run_simulation(config):
 
         E1 = sim.energy()
         dE = abs((E1 - E0) / E0)
-
+    
+       
         print(
             f"Output {i+1}/{Noutputs}: "
             f"t={sim.t:.1f} yr, "
