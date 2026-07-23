@@ -132,6 +132,8 @@ def build_simulation(config):
                 vz=particle["vz"],
                 name=name,
             )
+        
+            
             sim_time = particle["time"]
 
         sim.t = sim_time
@@ -308,13 +310,14 @@ def get_particles(snap_number, sim):
     with open("dump_data.json", "w") as file:
         json.dump(dict_row, file, indent=4)
 
-    
+    exit()
     
 
 
 def run_simulation(config):
     maxtime = float(config["integration"]["maxtime"])
     Noutputs = int(config["integration"]["Noutputs"])
+    orignal_step = maxtime/(Noutputs-1)
 
     times = np.linspace(0.0, maxtime, Noutputs)
 
@@ -330,9 +333,22 @@ def run_simulation(config):
 
     dump_condition = config['simulation']["dump"] 
 
+
     if not dump_condition:
         if os.path.exists(output_file):
             os.remove(output_file)
+    else:
+        file_path = Path("dump_data.json")
+        with open(file_path, "r", encoding="utf-8") as file:
+            dump_data = json.load(file)
+
+        start_time = list(dump_data.items())[0][1]["time"]
+
+        times=np.arange(start_time, maxtime+orignal_step, orignal_step)
+        print(f"{times=}")
+        exit()
+
+        
 
 
 
@@ -353,8 +369,8 @@ def run_simulation(config):
 
     for i, int_time in enumerate(times):
 
-        if i == 1:
-            exit()
+        # if i == 10:
+        #     exit()
 
         if dump_condition:
             get_particles(i,sim)

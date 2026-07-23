@@ -13,13 +13,13 @@ archive_path = "outputs/delayed_escape_test_new/delayed_escape_test_new_Complete
 
 sa = rebound.Simulationarchive(archive_path)
 
-print(f"{sa[-1].particles[0]=}")
 
-print(f"{sa[-1].t=}")
 
 archive_path_smalltime = "outputs/delayed_escape_test_new/delayed_escape_test_new.bin"
 
 sa_1 = rebound.Simulationarchive(archive_path_smalltime)
+
+
 print()
 print(f"{sa_1[0].particles[0]=}")
 
@@ -28,7 +28,8 @@ print(f"{sa_1[0].t=}")
 
 #findng by time
 print()
-print(f"{sa[0].particles[0]=}")
+print(f"{sa[10].particles[0]=}")
 
-print(f"{sa[0].t=}")
+print(f"{sa[10].t=}")
 
+#326.53061224,  367.34693878,  408.16326531,  448.97959184,
