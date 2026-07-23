@@ -391,16 +391,27 @@ def run_simulation(config):
 
         E1 = sim.energy()
         dE = abs((E1 - E0) / E0)
-    
-       
+
+        outputs_done = i + 1
+        outputs_remaining = Noutputs - outputs_done
+        avg_time_per_output = (time.time() - start_walltime) / outputs_done
+        eta_completion = avg_time_per_output * outputs_remaining
+
         print(
             f"Output {i+1}/{Noutputs}: "
             f"t={sim.t:.1f} yr, "
             f"dE/E0={dE:.2e}, "
             f"N={sim.N}"
         )
-
-               
+        print(
+            f"  Estimated time remaining to complete simulation: "
+            f"{format_time(eta_completion)}"
+        )
+        if outputs_remaining > 0:
+            print(
+                f"  Estimated time remaining to next output: "
+                f"{format_time(avg_time_per_output)}"
+            )
 
     total_runtime = time.time() - start_walltime
 
