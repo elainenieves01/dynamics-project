@@ -328,10 +328,13 @@ def run_simulation(config):
 
     print(f"Saving SimulationArchive to: {output_file}")
 
-    if os.path.exists(output_file):
-        os.remove(output_file)
-
     dump_condition = config['simulation']["dump"] 
+
+    if not dump_condition:
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+
 
     sim = build_simulation(config)
 
@@ -349,6 +352,10 @@ def run_simulation(config):
     start_walltime = time.time()
 
     for i, int_time in enumerate(times):
+
+        if i == 1:
+            exit()
+
         if dump_condition:
             get_particles(i,sim)
     

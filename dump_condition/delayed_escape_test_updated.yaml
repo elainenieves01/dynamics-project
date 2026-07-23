@@ -12,7 +12,7 @@ units:
 integration:
   integrator: "mercurius"
   timestep_fraction_of_planet_period: 0.1
-  maxtime: 1000.0
+  maxtime: 2000.0
   Noutputs: 50
   exit_max_distance: 100.0
 
